@@ -17,6 +17,8 @@ public class Program : ConsoleGame
 
         Resources.Load("./Font.flf", "FFont");
         Resources.Load("./Image1.png", "testImage");
+
+        AddThreads(EngineVariabels.Player);
     }
     int color = 0;
     int placement = 0;
