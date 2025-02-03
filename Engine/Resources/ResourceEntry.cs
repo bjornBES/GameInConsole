@@ -1,8 +1,8 @@
-﻿namespace GameInConsoleEngine.Resources
+﻿namespace GameInConsoleEngine.Resource
 {
     public class ResourceEntry
     {
-        public string ResourcePath;
+        public string value;
         public Type ResourceType;
     }
 }

@@ -13,6 +13,7 @@ namespace GameInConsole.Game.PlayerSystem
     {
         private List<InventorySlotEntry> PlayerInventory = new List<InventorySlotEntry>();
         private Stats PlayerStats;
+        private int counter = 0;
         public override void Start()
         {
             PlayerStats = new Stats(10,0);
@@ -25,11 +26,13 @@ namespace GameInConsole.Game.PlayerSystem
         public override void Stop()
         {
         }
-        public override void Update(float deltaTime)
+        public override void Update()
         {
+            counter++;
         }
-        public override void Render(float deltaTime)
+        public override void Render()
         {
+            Engine.WriteText(new Point(0, 20),$"Player = {counter}", 15);
         }
 
         public void AddItem(Items item, int quantity)

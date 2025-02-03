@@ -1,4 +1,4 @@
-﻿namespace GameInConsoleEngine.Resources
+﻿namespace GameInConsoleEngine.Resource
 {
     public static class Resources
     {
@@ -11,6 +11,11 @@
         public static void Load(string path, string key)
         {
             resourceEntries.Add(key, GetResourceEntry(path, null));
+        }
+
+        public static void Clear()
+        {
+            resourceEntries.Clear();
         }
 
         public static ResourceEntry GetEntry(string key)
@@ -26,7 +31,7 @@
         {
             ResourceEntry entry = new ResourceEntry();
 
-            entry.ResourcePath = path;
+            entry.value = path;
             entry.ResourceType = type;
 
             return entry;

@@ -1,4 +1,8 @@
-﻿namespace GameInConsoleEngine.Engine
+﻿using GameInConsoleEngine.Resource;
+using SDL2;
+using SixLabors.ImageSharp.Formats.Tiff.Compression;
+
+namespace GameInConsoleEngine.Engine
 {
     /// <summary>
     /// Abstract class to aid in Gamemaking.
@@ -24,13 +28,17 @@
         public int TargetFramerate { get; set; }
 
         private bool Running { get; set; }
-        private Thread gameThread;
 
-        private List<ThreadMono> threads = new List<ThreadMono>();  
+        private List<ThreadMono> threads = new List<ThreadMono>(16);
 
         private double[] framerateSamples;
-
+        IntPtr window;
+        IntPtr renderer;
         bool reset = false;
+
+        public double upadteTime;
+        public double upadteThreadTime;
+        public double renderTime;
 
         /// <summary> Initializes the ConsoleGame. Creates the instance of a ConsoleEngine and starts the game loop. </summary>
         /// <param name="width">Width of the window.</param>
@@ -41,45 +49,97 @@
         /// <see cref="FramerateMode"/> <see cref="ConsoleEngine"/>
         public void Construct(int width, int height, int fontW, int fontH)
         {
-        _reset:
 
             TargetFramerate = 30;
 
-            Engine = new ConsoleEngine(width, height, fontW, fontH);
+        _reset:
+            SDL.SDL_Init(SDL.SDL_INIT_VIDEO);
+            window = SDL.SDL_CreateWindow("Window Here :)", SDL.SDL_WINDOWPOS_CENTERED, SDL.SDL_WINDOWPOS_CENTERED, width, height, SDL.SDL_WindowFlags.SDL_WINDOW_SHOWN);
+            renderer = SDL.SDL_CreateRenderer(window, -1, SDL.SDL_RendererFlags.SDL_RENDERER_ACCELERATED);
+
+            Engine = new ConsoleEngine(width, height, fontW, fontH, window, renderer);
+
+            threads = new List<ThreadMono>();
             Start();
             for (int i = 0; i < threads.Count; i++)
             {
+                threads[i].Engine = Engine;
                 threads[i].Start();
             }
             StartTime = DateTime.Now;
 
-            gameThread = new Thread(new ThreadStart(GameLoopLocked));
-
             Running = true;
-            gameThread.Start();
 
             // gör special checks som ska gå utanför spelloopen
             // om spel-loopen hänger sig ska man fortfarande kunna avsluta
-            while (Running)
             {
-                if (reset)
+                int sampleCount = TargetFramerate;
+                framerateSamples = new double[sampleCount];
+                DateTime lastTime;
+                DateTime startOfUpdating;
+                float uncorrectedSleepDuration = 1000 / TargetFramerate;
+
+                while (Running)
                 {
+                    lastTime = DateTime.UtcNow;
+
+                    FrameCounter++;
+                    FrameCounter = FrameCounter % sampleCount;
+
+                    startOfUpdating = DateTime.UtcNow;
+                    Update(DeltaTime);
+                    upadteTime = (DateTime.UtcNow - startOfUpdating).TotalMilliseconds;
+
+                    Engine.ClearBuffer();
+
+                    startOfUpdating = DateTime.UtcNow;
                     for (int i = 0; i < threads.Count; i++)
                     {
-                        threads[i].Stop();
+                        Thread thread = new Thread(new ThreadStart(threads[i].UpdateAll));
+                        thread.Start();
                     }
-                    reset = false;
-                    Running = false;
-                    goto _reset;
-                }
-                CheckForExit();
-            }
-            for (int i = 0; i < threads.Count; i++)
-            {
-                threads[i].Stop();
-            }
-        }
+                    upadteThreadTime = (DateTime.UtcNow - lastTime).TotalMilliseconds;
 
+                    startOfUpdating = DateTime.UtcNow;
+                    Render(DeltaTime);
+                    renderTime = (DateTime.UtcNow - lastTime).TotalMilliseconds;
+
+                    if (CheckExit())
+                    {
+                        goto _reset;
+                    }
+
+                    TimeSpan diff = DateTime.UtcNow - lastTime;
+                    DeltaTime = (float)(1 / (TargetFramerate * diff.TotalSeconds));
+
+                    float computingDuration = (float)diff.TotalMilliseconds;
+                    int sleepDuration = (int)(uncorrectedSleepDuration - computingDuration);
+                    if (sleepDuration > 0)
+                    {
+                        // programmet ligger före maxFps, sänker det
+                        Thread.Sleep(sleepDuration);
+                    }
+
+                    //increases total frames
+                    FrameTotal++;
+
+                    // beräknar framerate
+
+                    framerateSamples[FrameCounter] = diff.TotalSeconds;
+                }
+            }
+            if (threads != null)
+            {
+                for (int i = 0; i < threads.Count; i++)
+                {
+                    threads[i].Stop();
+                }
+                threads = null;
+            }
+            Resources.Clear();
+            CleanUp();
+        }
+        /*
         private void GameLoopLocked()
         {
             int sampleCount = TargetFramerate;
@@ -108,7 +168,10 @@
                 {
                     threads[i].Update(DeltaTime);
                 }
+                SDL.SDL_RenderClear(renderer);
                 Render(DeltaTime);
+                SDL.SDL_RenderPresent(renderer);
+                Engine.getEvents();
 
                 // while (updateThread.ThreadState == ThreadState.Running || renderThread.ThreadState == ThreadState.Running)
                 // {
@@ -134,6 +197,31 @@
                 framerateSamples[FrameCounter] = diff.TotalSeconds;
             }
         }
+        */
+
+        bool CheckExit()
+        {
+            if (reset || Engine.Exit || Running == false)
+            {
+                reset = false;
+                Running = false;
+                Engine.RunEvents = false;
+                Resources.Clear();
+                for (int i = 0; i < threads.Count; i++)
+                {
+                    threads[i].Stop();
+                }
+                threads = null;
+                CleanUp();
+                if (Engine.Exit)
+                {
+                    return false;
+                }
+                return true;
+            }
+            CheckForExit();
+            return false;
+        }
 
         public void AddThreads(ThreadMono threadMono)
         {
@@ -158,6 +246,16 @@
             {
                 Running = false;
             }
+        }
+
+        void CleanUp()
+        {
+            SDL.SDL_DestroyRenderer(Engine.renderer);
+            SDL.SDL_DestroyWindow(Engine.window);
+            window = IntPtr.Zero;
+            renderer = IntPtr.Zero;
+            SDL.SDL_Quit();
+
         }
 
         /// <summary> Run once on Creating, import Resources here. </summary>

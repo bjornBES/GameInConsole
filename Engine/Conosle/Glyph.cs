@@ -3,11 +3,16 @@
     public struct Glyph
     {
         public char c;
-        public int fg;
-        public int bg;
+        public Color fg;
+        public Color bg;
 
-        public void set(char c_, int fg_, int bg_) { c = c_; fg = fg_; bg = bg_; }
+        public Glyph()
+        {
+            clear();
+        }
 
-        public void clear() { c = (char)0; fg = 0; bg = 0; }
+        public void set(char c_, Color fg_, Color bg_) { c = c_; fg = fg_; bg = bg_; }
+
+        public void clear() { c = (char)0; fg = Color.defaultColor; bg = Color.defaultColor; }
     }
 }
