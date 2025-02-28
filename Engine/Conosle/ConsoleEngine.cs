@@ -438,7 +438,7 @@ namespace GameInConsoleEngine.Engine
                     SetPixel(pos + new Point(x, y), colorIndex, bgColor, cToPrint);
                 }
             }
-            double diff = (DateTime.Now - dateTimeNow).TotalSeconds;
+            double diff = (DateTime.Now - dateTimeNow).TotalMilliseconds;
         }
 
         /// <summary>  Writes text to the buffer in a FIGlet font, calls new method with Background as the bgColor. </summary>

@@ -32,7 +32,7 @@ namespace GameInConsole.Game.PlayerSystem
         }
         public override void Render()
         {
-            Engine.WriteText(new Point(0, 20),$"Player = {counter}", 15);
+            //Engine.WriteText(new Point(0, 20),$"Player = {counter}", 15);
         }
 
         public void AddItem(Items item, int quantity)

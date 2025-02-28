@@ -26,9 +26,9 @@ public class Program : ConsoleGame
 
         AddThreads(EngineVariabels.Player);
 
-        for (int Y = 0; Y < Engine.WindowSize.Y / 16; Y++)
+        for (int Y = 0; Y < (Engine.WindowSize.Y / 16) - 1; Y++)
         {
-            testStr.Add("".PadLeft(Engine.WindowSize.X, 'E'));
+            testStr.Add("".PadLeft(Engine.WindowSize.X / 8, 'E'));
         }
     }
     int placement = 0;
@@ -39,24 +39,24 @@ public class Program : ConsoleGame
     public override void Render(float daltatime)
     {
 DateTime dateTimeNow = DateTime.Now;
-        Engine.ClearBuffer();
 
+        /*
         for (int i = 0; i < testStr.Count; i++)
         {
             DateTime dateTimeLoop = DateTime.Now;
-            GameInConsoleEngine.Engine.Point point = new GameInConsoleEngine.Engine.Point(0,i);
+            GameInConsoleEngine.Engine.Point point = new GameInConsoleEngine.Engine.Point(0,i + 1);
             Engine.WriteText(point, testStr[i], 15);
             double loopDiff = (DateTime.Now - dateTimeLoop).TotalMilliseconds;
             Console.WriteLine($"{i} @ {loopDiff:n2}");
         }
+        */
         
-        /*
         DialogEntry entry = new DialogEntry(NPC.Player, "Embrace the journey, not just the destination. Every step, every challenge, shapes who you become. Keep moving forward with purpose and passion.");
         DialogSystem.DisplayDialog(entry, Engine);
 
         Engine.PrintImage(new GameInConsoleEngine.Engine.Point(0, 1), indexes, image);
-        Engine.WriteText(new GameInConsoleEngine.Engine.Point(0, 0), $"Daltatime = {daltatime:n2}", 15);
-        Engine.WriteText(new GameInConsoleEngine.Engine.Point(0, 2), $"FPS = {GetFramerate():n2}", 15);
+        Engine.WriteText(new GameInConsoleEngine.Engine.Point(0, 0), $"FPS = {GetFramerate():n2}", 15);
+        Engine.WriteText(new GameInConsoleEngine.Engine.Point(0, 9), $"Daltatime = {daltatime:n2}", 15);
         Engine.WriteText(new GameInConsoleEngine.Engine.Point(0, 10), $"UpdateTime = {upadteTime:n2}", 15, 1);
         Engine.WriteText(new GameInConsoleEngine.Engine.Point(0, 11), $"ThreadTime = {upadteThreadTime:n2}", 15);
         Engine.WriteText(new GameInConsoleEngine.Engine.Point(0, 12), $"renderTime = {renderTime:n2}", 15);
@@ -73,9 +73,9 @@ DateTime dateTimeNow = DateTime.Now;
         Engine.WriteText(new GameInConsoleEngine.Engine.Point(9, 14), "L", 15, 8);
         Engine.WriteText(new GameInConsoleEngine.Engine.Point(10, 14), "D", 15, 9);
         Engine.WriteText(new GameInConsoleEngine.Engine.Point(11, 14), "!", 15, 10);
+        /*
         */
 
-        Engine.DisplayBuffer();
         double diff = (DateTime.Now - dateTimeNow).TotalSeconds;
     }
     public override void Update(float daltatime)

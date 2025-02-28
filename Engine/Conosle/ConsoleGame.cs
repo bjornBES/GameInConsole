@@ -1,4 +1,5 @@
-﻿using GameInConsoleEngine.Resource;
+﻿using GameInConsole.Engine.Tools;
+using GameInConsoleEngine.Resource;
 using SDL2;
 using SixLabors.ImageSharp.Formats.Tiff.Compression;
 
@@ -50,6 +51,10 @@ namespace GameInConsoleEngine.Engine
         public void Construct(int width, int height, int fontW, int fontH)
         {
 
+#if DEBUG
+            SDL.SDL_SetHint(SDL.SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING, "1");
+#endif
+
             TargetFramerate = 30;
 
         _reset:
@@ -76,7 +81,6 @@ namespace GameInConsoleEngine.Engine
                 int sampleCount = TargetFramerate;
                 framerateSamples = new double[sampleCount];
                 DateTime lastTime;
-                DateTime startOfUpdating;
                 float uncorrectedSleepDuration = 1000 / TargetFramerate;
 
                 while (Running)
@@ -86,23 +90,24 @@ namespace GameInConsoleEngine.Engine
                     FrameCounter++;
                     FrameCounter = FrameCounter % sampleCount;
 
-                    startOfUpdating = DateTime.UtcNow;
-                    Update(DeltaTime);
-                    upadteTime = (DateTime.UtcNow - startOfUpdating).TotalMilliseconds;
+                    RunUpdate();
+                    // Thread updateThread = new Thread(new ThreadStart(RunUpdate));
+                    // updateThread.Start();
 
                     Engine.ClearBuffer();
+                    Thread threadThread = new Thread(new ThreadStart(RunThreads));
+                    threadThread.Start();
 
-                    startOfUpdating = DateTime.UtcNow;
-                    for (int i = 0; i < threads.Count; i++)
+                    Thread renderThread = new Thread(new ThreadStart(RunRender));
+                    renderThread.Start();
+                    while (threadThread.ThreadState == ThreadState.Running || renderThread.ThreadState == ThreadState.Running)
                     {
-                        Thread thread = new Thread(new ThreadStart(threads[i].UpdateAll));
-                        thread.Start();
+                        
                     }
-                    upadteThreadTime = (DateTime.UtcNow - lastTime).TotalMilliseconds;
+                    Engine.DisplayBuffer();
 
-                    startOfUpdating = DateTime.UtcNow;
-                    Render(DeltaTime);
-                    renderTime = (DateTime.UtcNow - lastTime).TotalMilliseconds;
+
+
 
                     if (CheckExit())
                     {
@@ -139,6 +144,31 @@ namespace GameInConsoleEngine.Engine
             Resources.Clear();
             CleanUp();
         }
+
+        void RunUpdate()
+        {
+            Input.UpdateAll(Engine);
+            DateTime startOfUpdating = DateTime.UtcNow;
+            Update(DeltaTime);
+            upadteTime = (DateTime.UtcNow - startOfUpdating).TotalMilliseconds;
+        }
+        void RunThreads()
+        {
+            DateTime startOfUpdating = DateTime.UtcNow;
+            for (int i = 0; i < threads.Count; i++)
+            {
+                Thread thread = new Thread(new ThreadStart(threads[i].UpdateAll));
+                thread.Start();
+            }
+            upadteThreadTime = (DateTime.UtcNow - startOfUpdating).TotalMilliseconds;
+        }
+        void RunRender()
+        {
+            DateTime startOfUpdating = DateTime.UtcNow;
+            Render(DeltaTime);
+            renderTime = (DateTime.UtcNow - startOfUpdating).TotalMilliseconds;
+        }
+
         /*
         private void GameLoopLocked()
         {
