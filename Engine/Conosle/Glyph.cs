@@ -1,5 +1,4 @@
 ﻿using GameInConsole.Engine;
-using OpenTK.Mathematics;
 using SixLabors.ImageSharp.PixelFormats;
 
 namespace GameInConsoleEngine.Engine
@@ -54,17 +53,6 @@ namespace GameInConsoleEngine.Engine
             }
         }
         
-        public static implicit operator Color4(Glyph glyph)
-        {
-            if (glyph.c == '\0')
-            {
-                return glyph.backGround.GetColor4();
-            }
-            else
-            {
-                return glyph.foreGround.GetColor4();
-            }
-        }
         public static implicit operator Rgba32(Glyph glyph)
         {
             if (glyph.c == '\0')

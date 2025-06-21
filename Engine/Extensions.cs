@@ -7,7 +7,6 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using GameInConsoleEngine.Engine;
-using OpenTK.Mathematics;
 using SixLabors.ImageSharp.PixelFormats;
 
 namespace GameInConsole.Engine
@@ -57,30 +56,19 @@ namespace GameInConsole.Engine
             // If no color in the group is within the margin, return false
             return -1;
         }
-        public static Color4 GetColor4(this Rgba32 source)
-        {
-            return new Color4()
-            {
-                A = source.A,
-                B = source.B,
-                G = source.G,
-                R = source.R,
-            };
-        }
         public static byte[] GetBytes(this Rgba32 source)
         {
             return new byte[]
             {
-
                 source.R,
                 source.G,
                 source.B,
                 source.A,
             };
         }
-        public static Color GetColor(this Rgba32 source)
+        public static Raylib_cs.Color GetColor(this Rgba32 source)
         {
-            return new Color(source.R, source.G, source.B);
+            return new Raylib_cs.Color(source.R, source.G, source.B, source.A);
         }
 
         public static Rgba32 subAbsColor(Rgba32 a, Rgba32 b)
@@ -112,16 +100,6 @@ namespace GameInConsole.Engine
 
             // If no color in the group is within the margin, return false
             return -1;
-        }
-        public static Color4 GetColor4(this Abgr32 source)
-        {
-            return new Color4()
-            {
-                R = source.R,
-                G = source.G,
-                B = source.B,
-                A = source.A
-            };
         }
         public static byte[] GetBytes(this Abgr32 source)
         {
@@ -186,6 +164,13 @@ namespace GameInConsole.Engine
                 }
             }
             return result;
+        }
+    }
+    public static class RaylibColorExtensions
+    {
+        public static Rgba32 ToRGBA32(this Raylib_cs.Color color)
+        {
+            return new Rgba32(color.R, color.G, color.B, color.A);
         }
     }
 }

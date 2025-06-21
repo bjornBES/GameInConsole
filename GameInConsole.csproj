@@ -1,24 +1,22 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <OutputType>Exe</OutputType>
+        <OutputType>Library</OutputType>
         <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>disable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-        <StartupObject>Program</StartupObject>
+        <StartupObject></StartupObject>
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="OpenTK" Version="4.9.3" />
-      <PackageReference Include="SDL2" Version="2.0.5" />
-      <PackageReference Include="SDL2-CS" Version="2.0.0" />
-      <PackageReference Include="Sayers.SDL2.Core" Version="1.0.11" />
-      <PackageReference Include="SixLabors.ImageSharp" Version="3.1.6" />
+      <PackageReference Include="Raylib-cs" Version="7.0.1" />
+      <PackageReference Include="SixLabors.ImageSharp" Version="3.1.10" />
       <PackageReference Include="StbImageSharp" Version="2.30.15" />
       <PackageReference Include="StbImageWriteSharp" Version="1.16.7" />
       <PackageReference Include="System.Drawing.Common" Version="9.0.1" />
       <PackageReference Include="System.Drawing.Primitives" Version="4.3.0" />
+      <PackageReference Include="Terminal.Gui" Version="1.19.0" />
     </ItemGroup>
 	
 </Project>

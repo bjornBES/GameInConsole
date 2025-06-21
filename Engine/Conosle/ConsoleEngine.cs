@@ -1,14 +1,10 @@
-﻿using System.Data;
+using System.Data;
 using System.Drawing;
 using System.Text;
 using GameInConsole.Engine;
 using GameInConsoleEngine.Engine.Tools;
 using GameInConsoleEngine.Resource;
-using OpenTK.Graphics.OpenGL4;
-using OpenTK.Windowing.Common;
-using OpenTK.Windowing.Desktop;
-using OpenTK.Windowing.GraphicsLibraryFramework;
-using SDL2;
+using Raylib_cs;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
@@ -21,7 +17,6 @@ namespace GameInConsoleEngine.Engine
     {
         const int MAX_COLOR = 256;
 
-        public GameWindow window;
         // public IntPtr renderer = IntPtr.Zero;
 
         /// <summary> The active color palette. </summary> <see cref="Color"/>
@@ -49,7 +44,7 @@ namespace GameInConsoleEngine.Engine
         /// <param name="height">Target window height.</param>
         /// <param name="fontW">Target font width.</param>
         /// <param name="fontH">Target font height.</param>
-        public ConsoleEngine(int width, int height, int fontW, int fontH, GameWindow _window)
+        public ConsoleEngine(int width, int height, int fontW, int fontH)
         // public ConsoleEngine(int width, int height, int fontW, int fontH, IntPtr _window, IntPtr _renderer)
         {
             if (width < 1 || height < 1)
@@ -57,14 +52,7 @@ namespace GameInConsoleEngine.Engine
             if (fontW < 1 || fontH < 1)
                 throw new ArgumentOutOfRangeException();
 
-            window = _window;
-
             SetTitle("test");
-            // SDL.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // black color
-            // SDL.SDL_RenderClear(renderer);
-            // SDL.SDL_RenderPresent(renderer);
-
-            window.MousePosition = new OpenTK.Mathematics.Vector2(0, 0);
 
             ConsoleBuffer = new ConsoleBuffer(width, height);
 
@@ -85,22 +73,6 @@ namespace GameInConsoleEngine.Engine
                     GlyphBuffer[x, y] = new Glyph(Palette[Background]);
                 }
             }
-
-            // NativeMethods.Coord size = new NativeMethods.Coord((short)width, (short)height);
-            // NativeMethods.SetConsoleScreenBufferSize(stdOutputHandle, size);
-
-            // NativeMethods.SmallRect windowsize = new NativeMethods.SmallRect(0, 0, (short)(width - 1), (short)(height - 1));
-            // NativeMethods.SetConsoleWindowInfo(stdOutputHandle, true, ref windowsize);
-
-            // here we make it so we can have more then 16 colors
-            // if (NativeMethods.GetConsoleMode(stdOutputHandle, out uint mode))
-            // {
-            //     mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN;
-            //     NativeMethods.SetConsoleMode(stdOutputHandle, mode);
-            // }
-
-
-            // NativeMethods.SetConsoleMode(stdInputHandle, 0x0080);
 
             // ConsoleFont.SetFont(stdOutputHandle, (short)fontW, (short)fontH);
         }
@@ -269,8 +241,7 @@ namespace GameInConsoleEngine.Engine
 
         public void SetTitle(string title)
         {
-            window.Title = title;
-            // SDL.SDL_SetWindowTitle(window, title);
+            Raylib.SetWindowTitle(title);
         }
 
         /// <summary>Gets Background</summary>
@@ -284,9 +255,10 @@ namespace GameInConsoleEngine.Engine
         public void ClearBuffer()
         {
             DateTime dateTimeNow = DateTime.Now;
-            /*Array.Clear(CharBuffer, 0, CharBuffer.Length);
-            Array.Clear(ColorBuffer, 0, ColorBuffer.Length);
-            Array.Clear(BackgroundBuffer, 0, BackgroundBuffer.Length);*/
+            Raylib.BeginDrawing();
+            Raylib.ClearBackground(Palette[Background].GetColor());
+            Raylib.DrawFPS(0, 0);
+            Raylib.EndDrawing();
             for (int y = 0; y < GlyphBuffer.GetLength(1); y++)
                 for (int x = 0; x < GlyphBuffer.GetLength(0); x++)
                     GlyphBuffer[x, y] = new Glyph(Palette[Background]);
@@ -294,11 +266,13 @@ namespace GameInConsoleEngine.Engine
         }
 
         /// <summary> Blits the screenbuffer to the Console window. </summary>
-        public void DisplayBuffer()
+        public void DisplayBuffer(bool running)
         {
             DateTime dateTimeNow = DateTime.Now;
             ConsoleBuffer.SetBuffer(GlyphBuffer, Palette[Background]);
-            ConsoleBuffer.Blit(window, Palette[Background]);
+            Raylib.BeginDrawing();
+            ConsoleBuffer.Blit(Palette[Background], running);
+            Raylib.EndDrawing();
             double diff = (DateTime.Now - dateTimeNow).TotalSeconds;
         }
 
@@ -392,39 +366,8 @@ namespace GameInConsoleEngine.Engine
         public void WriteText(Point pos, char c, int fgColor, int bgColor)
         {
             DateTime dateTimeNow = DateTime.Now;
-            int charIndex = (byte)c;
-            double diff1 = (DateTime.Now - dateTimeNow).TotalMilliseconds;
-            Rgba32[] fontColors = FontTools.GetChar(charIndex, Palette);
-            double diff2 = (DateTime.Now - dateTimeNow).TotalMilliseconds;
-            DateTime dateTimeNow1 = DateTime.Now;
-            for (int y = 0; y < FontTools.fontHeight; y++)
-            {
-                int startIndex = y * FontTools.fontWidth;
-                int endIndex = y * FontTools.fontWidth + FontTools.fontWidth;
-                Rgba32[] colors = fontColors[startIndex..endIndex];
-                SetPixels(pos, colors);
-                pos.Y++;
-                /*
-                for (int x = 0; x < FontTools.fontWidth; x++) 
-                {
-                    int i = y * FontTools.fontWidth + x;
-                    Color color = fontColors[i];
-                    char cToPrint = c;
-                    if (color.AllColor > 0) // have a color
-                    {
-                        color = Palette[fgColor];
-                    }
-                    else // background
-                    {
-                        cToPrint = '\0';
-                    }
-                    int colorIndex = Palette.ToList().IndexOf(fontColors[i]);
-                    SetPixel(pos + new Point(x, y), colorIndex, bgColor, cToPrint);
-                }
-                 */
-            }
+            SetPixel(pos, fgColor, bgColor, c);
             double diff = (DateTime.Now - dateTimeNow).TotalMilliseconds;
-            double _1diff = (DateTime.Now - dateTimeNow1).TotalMilliseconds;
             // 1: 13.9948
             // 2: 12.1910
         }
@@ -776,7 +719,7 @@ namespace GameInConsoleEngine.Engine
         /// <returns>True if Console is in focus</returns>
         private bool ConsoleFocused()
         {
-            return window.IsFocused;
+            return false; // window.IsFocused;
         }
 
         /// <summary> Checks if specified key is pressed. </summary>
@@ -788,6 +731,7 @@ namespace GameInConsoleEngine.Engine
             {
                 return false;
             }
+            /*
             KeyboardState keyboard = window.KeyboardState;
             if (keyboard.IsKeyPressed((Keys)key))
             {
@@ -797,6 +741,8 @@ namespace GameInConsoleEngine.Engine
             {
                 return false;
             }
+             */
+            return false;
         }
 
         /// <summary> Checks if specified keyCode is pressed. </summary>
@@ -816,6 +762,7 @@ namespace GameInConsoleEngine.Engine
             {
                 return false;
             }
+            /*
             KeyboardState keyboard = window.KeyboardState;
             if (keyboard.IsKeyDown((Keys)key))
             {
@@ -825,6 +772,8 @@ namespace GameInConsoleEngine.Engine
             {
                 return false;
             }
+             */
+            return false;
         }
 
         /// <summary> Checks if specified keyCode is pressed down. </summary>
@@ -843,6 +792,7 @@ namespace GameInConsoleEngine.Engine
             {
                 return false;
             }
+            /*
             MouseState mouse = window.MouseState;
             if (mouse.IsAnyButtonDown)
             {
@@ -855,6 +805,8 @@ namespace GameInConsoleEngine.Engine
             {
                 return false;
             }
+             */
+            return false;
             return false;
         }
 
@@ -866,6 +818,7 @@ namespace GameInConsoleEngine.Engine
             {
                 return false;
             }
+            /*
             MouseState mouse = window.MouseState;
             if (mouse.IsAnyButtonDown)
             {
@@ -878,6 +831,7 @@ namespace GameInConsoleEngine.Engine
             {
                 return false;
             }
+             */
             return false;
         }
 
@@ -889,6 +843,7 @@ namespace GameInConsoleEngine.Engine
             {
                 return false;
             }
+            /*
             MouseState mouse = window.MouseState;
             if (mouse.IsAnyButtonDown)
             {
@@ -901,6 +856,7 @@ namespace GameInConsoleEngine.Engine
             {
                 return false;
             }
+             */
             return false;
         }
 
@@ -912,11 +868,14 @@ namespace GameInConsoleEngine.Engine
             {
                 return new Point(-1,-1);
             }
+            /*
             MouseState mouse = window.MouseState;
             int posX = (int)(mouse.X * window.Size.X);
             int posY = (int)(mouse.Y * window.Size.Y);
             Point point = new Point(posX, posY);
             return new Point(Utility.Clamp(point.X, 0, WindowSize.X - 1), Utility.Clamp(point.Y, 0, WindowSize.Y - 1));
+             */
+            return new Point(0, 0);
         }
     }
 }

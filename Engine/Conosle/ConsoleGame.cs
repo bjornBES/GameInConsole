@@ -1,14 +1,10 @@
-﻿using GameInConsole.Engine.Tools;
+using GameInConsole.Engine.Tools;
 using GameInConsoleEngine.Resource;
-using SDL2;
-using OpenTK.Graphics.OpenGL4;
-using OpenTK.Windowing.Common;
-using OpenTK.Windowing.Desktop;
-using OpenTK.Windowing.GraphicsLibraryFramework;
-using OpenTK;
 using SixLabors.ImageSharp.Formats.Tiff.Compression;
 using System.Threading.Tasks;
-using OpenTK.Mathematics;
+using Raylib_cs;
+using System.Diagnostics;
+using GameInConsole.Engine;
 
 namespace GameInConsoleEngine.Engine
 {
@@ -18,34 +14,33 @@ namespace GameInConsoleEngine.Engine
     /// </summary>
     public abstract class ConsoleGame
     {
-        /// <summary> Instance of a ConsoleEngine. </summary>
         public ConsoleEngine Engine { get; private set; }
 
-        /// <summary> A counter representing the current unique frame we're at. </summary>
         public int FrameCounter { get; set; }
-
-        /// <summary> A counter representing the total frames since launch</summary>
         public int FrameTotal { get; private set; }
-        /// <summary> Factor for generating framerate-independent physics. time between last frame and current. </summary>
         public float DeltaTime { get; set; } = 0;
-
-        /// <summary>The time the program started in DateTime, set after Create()</summary>
         public DateTime StartTime { get; private set; }
-
-        /// <summary> The framerate the engine is trying to run at. </summary>
-        public int TargetFramerate { get; set; }
+        private int _TargetFramerate { get; set; }
+        public int TargetFramerate
+        {
+            get
+            {
+                return _TargetFramerate;
+            }
+            set
+            {
+                Raylib.SetTargetFPS(value);
+                _TargetFramerate = value;
+            }
+        }
 
         private bool Running { get; set; }
-
         private List<ThreadMono> threads = new List<ThreadMono>(16);
-
         private double[] framerateSamples;
-        GameWindow window;
 
-        public double upadteTime;
-        public double upadteThreadTime;
+        public double updateTime;
+        public double updateThreadTime;
         public double renderTime;
-        bool doneRender;
 
         /// <summary> Initializes the ConsoleGame. Creates the instance of a ConsoleEngine and starts the game loop. </summary>
         /// <param name="width">Width of the window.</param>
@@ -56,80 +51,53 @@ namespace GameInConsoleEngine.Engine
         /// <see cref="FramerateMode"/> <see cref="ConsoleEngine"/>
         public void Construct(int width, int height, int fontW, int fontH)
         {
-            TargetFramerate = 30;
-            var nativeWindowSettings = new NativeWindowSettings()
-            {
-                ClientSize = new Vector2i(width, height),
-                Title = "LearnOpenTK - Creating a Window",
-                
-                // This is needed to run on macos
-                Flags = ContextFlags.ForwardCompatible,
-                IsEventDriven = true,
-            };
-            GameWindowSettings gameWindowSettings = new GameWindowSettings()
-            {
-                UpdateFrequency = TargetFramerate
-            };
-            window = new GameWindow(gameWindowSettings, nativeWindowSettings);
+            Raylib.InitWindow(width * fontW, height * fontH, "Untitled Game");
 
-            window.Load += StartEngine;
-            window.UpdateFrame += EngineUpdate;
-            window.Unload += EngineUnload;
-            window.RenderFrame += EngineRenderFrame;
-            window.FocusedChanged += EngineFocusChanged;
+            Raylib.SetTargetFPS(30);
 
+            _TargetFramerate = 30;
             threads = new List<ThreadMono>();
 
-            int sampleCount = TargetFramerate;
+            int sampleCount = _TargetFramerate;
             framerateSamples = new double[sampleCount];
 
             RunAwake();
-
-            Engine = new ConsoleEngine(width, height, fontW, fontH, window);
-
+            Engine = new ConsoleEngine(width, height, fontW, fontH);
             Running = true;
 
-            window.Run();
+            StartEngine();
+            RunMainLoop();
 
-            if (threads != null)
-            {
-                for (int i = 0; i < threads.Count; i++)
-                {
-                    threads[i].Stop();
-                }
-                threads = null;
-            }
-            Resources.Clear();
-            CleanUp();
-        }
-
-        private void EngineFocusChanged(FocusedChangedEventArgs obj)
-        {
-            Engine.FocusChanged(obj.IsFocused);
-            if (obj.IsFocused)
-            {
-                
-            }
-            else
+            while (Running)
             {
 
             }
         }
 
-        private void EngineRenderFrame(FrameEventArgs obj)
+        void RunMainLoop()
         {
-            if (!window.IsFocused)
+            while (Running && !Raylib.WindowShouldClose())
             {
-                return;
+                _ = EngineUpdate();
+                _ = EngineRenderFrame();
+                // await Task.Delay(1000 / _TargetFramerate);
             }
-            DateTime dateTimeNow = DateTime.Now;
-            doneRender = false;
+            Running = false;
+            EngineUnload();
+            Raylib.CloseWindow();
+        }
+
+        private async Task EngineRenderFrame()
+        {
+            Stopwatch sw = Stopwatch.StartNew();
+
+
             Engine.ClearBuffer();
-            double diff1 = (DateTime.Now - dateTimeNow).TotalMilliseconds;
-            RunRender((float)obj.Time);
-            double diff2 = (DateTime.Now - dateTimeNow).TotalMilliseconds;
-            Engine.DisplayBuffer();
-            double diff3 = (DateTime.Now - dateTimeNow).TotalMilliseconds;
+            await RunRender(DeltaTime);
+            Engine.DisplayBuffer(Running);
+
+            sw.Stop();
+            renderTime = sw.Elapsed.TotalMilliseconds;
         }
 
         private void EngineUnload()
@@ -147,27 +115,21 @@ namespace GameInConsoleEngine.Engine
             CleanUp();
         }
 
-        void EngineUpdate(FrameEventArgs args)
+        async Task EngineUpdate()
         {
-            if (!window.IsFocused)
-            {
-                return;
-            }
-            DateTime lastTime = DateTime.UtcNow;
-            window.UpdateFrequency = TargetFramerate;
+            Stopwatch sw = Stopwatch.StartNew();
 
-            FrameCounter++;
-            FrameCounter = FrameCounter % TargetFramerate;
+            FrameCounter = (FrameCounter + 1) % _TargetFramerate;
+            await RunUpdate(DeltaTime);
+
+            sw.Stop();
+            updateTime = sw.Elapsed.TotalMilliseconds;
+            DeltaTime = (float)sw.Elapsed.TotalSeconds;
             
-            RunUpdate(args.Time);
-
-            TimeSpan diff = DateTime.UtcNow - lastTime;
-            DeltaTime = (float)(1 / (TargetFramerate * diff.TotalMilliseconds));
-
-            framerateSamples[FrameCounter] = (double)diff.TotalMilliseconds;
+            framerateSamples[FrameCounter] = updateTime;
 
             FrameTotal++;
-            Console.WriteLine($"updateTime:{upadteTime:n2}, renderTime:{renderTime:n2}");
+            Console.WriteLine($"updateTime:{updateTime:n2}, renderTime:{renderTime:n2}");
         }
 
         void StartEngine()
@@ -189,64 +151,32 @@ namespace GameInConsoleEngine.Engine
             }
             Awake();
         }
-        async void RunUpdate(double deltaTime)
+        private async Task RunUpdate(float deltaTime)
         {
-            if (!window.IsFocused)
-            {
-                return;
-            }
-            DateTime startOfUpdating = DateTime.UtcNow;
-            Input.UpdateAll(Engine);
+            Stopwatch sw = Stopwatch.StartNew();
 
-            List<Task> updateTasks = threads.Select(thread => thread.runUpdate()).ToList();
+            Input.UpdateAll(Engine);
+            var updateTasks = threads.Select(t => t.runUpdate()).ToList();
             await Task.WhenAll(updateTasks);
 
-            Update((float)deltaTime);
-            upadteTime = (DateTime.UtcNow - startOfUpdating).TotalMilliseconds;
+            Update(deltaTime);
+
+            sw.Stop();
+            updateThreadTime = sw.Elapsed.TotalMilliseconds;
         }
-        async void RunRender(float deltaTime)
+
+        private async Task RunRender(float deltaTime)
         {
-            if (!window.IsFocused)
-            {
-                return;
-            }
-            DateTime startOfUpdating = DateTime.Now;
-            
-            double diff1 = (DateTime.Now - startOfUpdating).TotalMilliseconds;
-            List<Task> renderTasks = threads.Select(thread => thread.runRender()).ToList();
+            Stopwatch sw = Stopwatch.StartNew();
+
+            var renderTasks = threads.Select(t => t.runRender()).ToList();
             await Task.WhenAll(renderTasks);
-            double diff2 = (DateTime.Now - startOfUpdating).TotalMilliseconds;
 
             Render(deltaTime);
-            double diff3 = (DateTime.Now - startOfUpdating).TotalMilliseconds;
-            renderTime = (DateTime.Now  - startOfUpdating).TotalMilliseconds;
-            doneRender = true;
+
+            sw.Stop();
+            renderTime = sw.Elapsed.TotalMilliseconds;
         }
-/*
-        bool CheckExit()
-        {
-            if (reset || Engine.Exit || Running == false)
-            {
-                reset = false;
-                Running = false;
-                Engine.RunEvents = false;
-                Resources.Clear();
-                for (int i = 0; i < threads.Count; i++)
-                {
-                    threads[i].Stop();
-                }
-                threads = null;
-                CleanUp();
-                if (Engine.Exit)
-                {
-                    return false;
-                }
-                return true;
-            }
-            CheckForExit();
-            return false;
-        }
- */
 
         public void AddThreads(ThreadMono threadMono)
         {
@@ -257,12 +187,20 @@ namespace GameInConsoleEngine.Engine
         /// <returns> Application Framerate. </returns>
         public double GetFramerate()
         {
-            return 1 / (framerateSamples.Sum() / TargetFramerate);
+            return 1000.0 / (framerateSamples.Sum() / _TargetFramerate);
+        }
+
+        public void SetEngineToText()
+        {
+            EngineConfig.UseTextBasedGraphics = true;
+        }
+        public void SetEngineToGraphics()
+        {
+            EngineConfig.UseTextBasedGraphics = false;
         }
 
         void CleanUp()
         {
-            window.Close();
         }
 
         /// <summary> Run once before the first fream, import Resources here. </summary>
@@ -274,4 +212,6 @@ namespace GameInConsoleEngine.Engine
         /// <summary> Run every frame after updating. Do drawing here. </summary>
         public abstract void Render(float daltatime);
     }
+
+    
 }

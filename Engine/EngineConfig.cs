@@ -8,6 +8,6 @@ namespace GameInConsole.Engine
 {
     internal class EngineConfig
     {
-        internal bool UseTextBasedGraphics { get; set; } = true;
+        static internal bool UseTextBasedGraphics { get; set; } = false;
     }
 }

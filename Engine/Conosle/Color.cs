@@ -1,6 +1,4 @@
-﻿using OpenTK.Mathematics;
-using SDL2;
-using SixLabors.ImageSharp.PixelFormats;
+﻿using SixLabors.ImageSharp.PixelFormats;
 
 namespace GameInConsoleEngine.Engine
 {
@@ -23,10 +21,6 @@ namespace GameInConsoleEngine.Engine
             this.R = (byte)r;
             this.G = (byte)g;
             this.B = (byte)b;
-        }
-        public Color4 GetGLColor()
-        {
-            return new Color4() { R = R, G = G, B = B, A = 255 };
         }
         public int NearToColor(Color[] colors, int colorMargin)
         {
@@ -65,10 +59,6 @@ namespace GameInConsoleEngine.Engine
         public override string ToString()
         {
             return $"{{{R},{G},{B}}}";
-        }
-        public static implicit operator Color4(Color color)
-        {
-            return color.GetGLColor();
         }
         public static implicit operator Rgba32(Color color)
         {
