@@ -5,6 +5,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System.Net.Http.Headers;
 using GameInConsole.Game.Dialogsystem;
+using GameInConsole.Engine;
 
 public class Program : ConsoleGame
 {
@@ -12,7 +13,9 @@ public class Program : ConsoleGame
     {
         new Program().Construct(800, 800, 4, 8);
     }
-
+    public override void Awake()
+    {
+    }
     public override void Start()
     {
         EngineVariabels.Start();
@@ -25,11 +28,12 @@ public class Program : ConsoleGame
         Engine.SetFont("./Resources/ConsoleFont.png", 16, 8, 16, 16);
 
         AddThreads(EngineVariabels.Player);
-
+        /*
         for (int Y = 0; Y < (Engine.WindowSize.Y / 16) - 1; Y++)
         {
             testStr.Add("".PadLeft(Engine.WindowSize.X / 8, 'E'));
         }
+         */
     }
     int placement = 0;
     int[] indexes;
@@ -40,17 +44,6 @@ public class Program : ConsoleGame
     {
 DateTime dateTimeNow = DateTime.Now;
 
-        /*
-        for (int i = 0; i < testStr.Count; i++)
-        {
-            DateTime dateTimeLoop = DateTime.Now;
-            GameInConsoleEngine.Engine.Point point = new GameInConsoleEngine.Engine.Point(0,i + 1);
-            Engine.WriteText(point, testStr[i], 15);
-            double loopDiff = (DateTime.Now - dateTimeLoop).TotalMilliseconds;
-            Console.WriteLine($"{i} @ {loopDiff:n2}");
-        }
-        */
-        
         DialogEntry entry = new DialogEntry(NPC.Player, "Embrace the journey, not just the destination. Every step, every challenge, shapes who you become. Keep moving forward with purpose and passion.");
         DialogSystem.DisplayDialog(entry, Engine);
 
@@ -90,6 +83,7 @@ DateTime dateTimeNow = DateTime.Now;
         {
             for (int i = 0; i < indexes.Length; i++)
             {
+                indexes[i] %= 255;
                 indexes[i]++;
             }
         }
@@ -97,7 +91,7 @@ DateTime dateTimeNow = DateTime.Now;
         {
             string path = Resources.GetEntry("testImage").value;
             image = ImageTools.GetImageBitmap(path);
-            GameInConsoleEngine.Engine.Color[] colors = ImageTools.GetColors(image);
+            GameInConsoleEngine.Engine.Color[] colors = ImageTools.CachedData.FromRgba32ToColor();
             indexes = Engine.GetColorIndex(colors);
         }
     }

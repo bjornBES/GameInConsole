@@ -1,7 +1,13 @@
 ﻿using System.Data;
+using System.Drawing;
 using System.Text;
+using GameInConsole.Engine;
 using GameInConsoleEngine.Engine.Tools;
 using GameInConsoleEngine.Resource;
+using OpenTK.Graphics.OpenGL4;
+using OpenTK.Windowing.Common;
+using OpenTK.Windowing.Desktop;
+using OpenTK.Windowing.GraphicsLibraryFramework;
 using SDL2;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -15,11 +21,11 @@ namespace GameInConsoleEngine.Engine
     {
         const int MAX_COLOR = 256;
 
-        public IntPtr window = IntPtr.Zero;
-        public IntPtr renderer = IntPtr.Zero;
+        public GameWindow window;
+        // public IntPtr renderer = IntPtr.Zero;
 
         /// <summary> The active color palette. </summary> <see cref="Color"/>
-        public Color[] Palette { get; private set; }
+        public Rgba32[] Palette { get; private set; }
 
         /// <summary> The current size of the font. </summary> <see cref="Point"/>
         public Point FontSize { get; private set; }
@@ -34,10 +40,6 @@ namespace GameInConsoleEngine.Engine
         private int Background { get; set; }
         private ConsoleBuffer ConsoleBuffer { get; set; }
         private bool IsBorderless { get; set; }
-        private SDL.SDL_KeyboardEvent keyboardEvent;
-        private SDL.SDL_MouseWheelEvent mouseWheelEvent;
-        private SDL.SDL_MouseButtonEvent mouseButtonEvent;
-        private SDL.SDL_MouseMotionEvent mouseMotionEvent;
         public bool Exit { get; private set; } = false;
         public bool RunEvents = false;
 
@@ -47,37 +49,22 @@ namespace GameInConsoleEngine.Engine
         /// <param name="height">Target window height.</param>
         /// <param name="fontW">Target font width.</param>
         /// <param name="fontH">Target font height.</param>
-        public ConsoleEngine(int width, int height, int fontW, int fontH, IntPtr _window, IntPtr _renderer)
+        public ConsoleEngine(int width, int height, int fontW, int fontH, GameWindow _window)
+        // public ConsoleEngine(int width, int height, int fontW, int fontH, IntPtr _window, IntPtr _renderer)
         {
             if (width < 1 || height < 1)
                 throw new ArgumentOutOfRangeException();
             if (fontW < 1 || fontH < 1)
                 throw new ArgumentOutOfRangeException();
 
-            renderer = _renderer;
             window = _window;
 
-            SDL.SDL_SetWindowTitle(window, "test");
-            SDL.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // black color
-            SDL.SDL_RenderClear(renderer);
-            SDL.SDL_RenderPresent(renderer);
+            SetTitle("test");
+            // SDL.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // black color
+            // SDL.SDL_RenderClear(renderer);
+            // SDL.SDL_RenderPresent(renderer);
 
-
-            // NativeMethods.ConsoleCursorInfo consoleCursorInfo = new NativeMethods.ConsoleCursorInfo()
-            // {
-            //     bVisible = false,
-            //     dwSize = 100,
-            // };
-
-            // NativeMethods.SetConsoleTitle("test");
-            // unsafe
-            // {
-            //     NativeMethods.SetConsoleCursorInfo(stdOutputHandle, (IntPtr)(&consoleCursorInfo));
-            // }
-
-            //sets console location to 0,0 to try and avoid the error where the console is to big
-            // NativeMethods.SetWindowPos(consoleHandle, 0, 0, 0, 0, 0, 0x0046);
-
+            window.MousePosition = new OpenTK.Mathematics.Vector2(0, 0);
 
             ConsoleBuffer = new ConsoleBuffer(width, height);
 
@@ -88,10 +75,16 @@ namespace GameInConsoleEngine.Engine
             // ColorBuffer = new int[width, height];
             // BackgroundBuffer = new int[width, height];
 
+            SetBackground(0);
+            SetPalette(Palettes.vgaColors);
             GlyphBuffer = new Glyph[width, height];
             for (int y = 0; y < GlyphBuffer.GetLength(1); y++)
+            {
                 for (int x = 0; x < GlyphBuffer.GetLength(0); x++)
-                    GlyphBuffer[x, y] = new Glyph();
+                {
+                    GlyphBuffer[x, y] = new Glyph(Palette[Background]);
+                }
+            }
 
             // NativeMethods.Coord size = new NativeMethods.Coord((short)width, (short)height);
             // NativeMethods.SetConsoleScreenBufferSize(stdOutputHandle, size);
@@ -106,55 +99,28 @@ namespace GameInConsoleEngine.Engine
             //     NativeMethods.SetConsoleMode(stdOutputHandle, mode);
             // }
 
-            SetBackground(0);
-            SetPalette(Palettes.vgaColors);
-
-            RunEvents = true;
-            Thread eventThread = new Thread(new ThreadStart(getEvents));
-            eventThread.Start();
 
             // NativeMethods.SetConsoleMode(stdInputHandle, 0x0080);
 
             // ConsoleFont.SetFont(stdOutputHandle, (short)fontW, (short)fontH);
         }
 
-        public void getEvents()
+        public void CleanUp()
         {
-            while (RunEvents)
-            {
-                if (SDL.SDL_PollEvent(out SDL.SDL_Event e) == 1)
-                {
-                    switch (e.type)
-                    {
-                        case SDL.SDL_EventType.SDL_KEYUP:
-                        case SDL.SDL_EventType.SDL_KEYDOWN:
-                            keyboardEvent = e.key;
-                            break;
-                        case SDL.SDL_EventType.SDL_MOUSEMOTION:
-                            mouseMotionEvent = e.motion;
-                            break;
-                        case SDL.SDL_EventType.SDL_MOUSEWHEEL:
-                            mouseWheelEvent = e.wheel;
-                            break;
-                        case SDL.SDL_EventType.SDL_MOUSEBUTTONUP:
-                        case SDL.SDL_EventType.SDL_MOUSEBUTTONDOWN:
-                            mouseButtonEvent = e.button;
-                            break;
-                        case SDL.SDL_EventType.SDL_QUIT:
-                            RunEvents = false;
-                            Exit = true;
-                            break;
-                    }
-                }
-            }
+            ConsoleBuffer.Exit();
         }
 
-        public int[] GetColorIndex(Color[] colors)
+        public void FocusChanged(bool IsFocused)
+        {
+            
+        }
+
+        public int[] GetColorIndex(Rgba32[] colors)
         {
             List<int> ints = new List<int>();
             for (int i = 0; i < colors.Length; i++)
             {
-                Color color = colors[i];
+                Rgba32 color = colors[i];
                 for (int colorMargin = 25; colorMargin < 255; colorMargin += 5)
                 {
                     int index = color.NearToColor(Palette, colorMargin);
@@ -166,6 +132,10 @@ namespace GameInConsoleEngine.Engine
                 }
             }
             return ints.ToArray();
+        }
+        public int[] GetColorIndex(Color[] colors)
+        {
+            return GetColorIndex(colors.FromColorToRgba32());
         }
         public void PrintImage(Point startPoint, int[] image, int imageWidth, int imageHeight)
         {
@@ -205,6 +175,26 @@ namespace GameInConsoleEngine.Engine
             SetPixel(selectedPoint, color, Background, character);
         }
 
+        public void SetPixels(Point selectedPoint, Rgba32[] color)
+        {
+            if (selectedPoint.X >= GlyphBuffer.GetLength(0) || selectedPoint.Y >= GlyphBuffer.GetLength(1)
+                || selectedPoint.X < 0 || selectedPoint.Y < 0)
+                return;
+
+            for (int i = 0; i < color.Length; i++)
+            {
+                char c = (char)ConsoleCharacter.Full;
+                if (color[i].AllColors() > 0) // have a color
+                {
+                }
+                else // background
+                {
+                    c = '\0';
+                }
+                GlyphBuffer[selectedPoint.X + i, selectedPoint.Y].set(c, color[i], Palette[Background]);
+            }
+        }
+
         //new Draw method, which supports background
         public void SetPixel(Point selectedPoint, int fgColor, int bgColor, char character)
         {
@@ -212,7 +202,8 @@ namespace GameInConsoleEngine.Engine
                 || selectedPoint.X < 0 || selectedPoint.Y < 0)
                 return;
 
-            /*CharBuffer[selectedPoint.X, selectedPoint.Y] = character;
+            /*
+            CharBuffer[selectedPoint.X, selectedPoint.Y] = character;
             ColorBuffer[selectedPoint.X, selectedPoint.Y] = fgColor;
             BackgroundBuffer[selectedPoint.X, selectedPoint.Y] = bgColor;*/
             GlyphBuffer[selectedPoint.X, selectedPoint.Y].set(character, Palette[fgColor], Palette[bgColor]);
@@ -237,36 +228,16 @@ namespace GameInConsoleEngine.Engine
         /// <exception cref="ArgumentException"/> <exception cref="ArgumentNullException"/>
         public void SetPalette(Color[] colors)
         {
+            SetPalette(colors.FromColorToRgba32());
+        }
+        /// <summary> Sets the console's color palette </summary>
+        /// <param name="colors"></param>
+        /// <exception cref="ArgumentException"/> <exception cref="ArgumentNullException"/>
+        public void SetPalette(Rgba32[] colors)
+        {
             if (colors.Length > MAX_COLOR)
                 throw new ArgumentException($"Windows command prompt only support {MAX_COLOR} colors.");
             Palette = colors ?? throw new ArgumentNullException();
-
-
-            unsafe
-            {
-                SDL.SDL_Palette* palette = (SDL.SDL_Palette*)SDL.SDL_AllocPalette(MAX_COLOR).ToPointer();
-                (*palette).refcount = colors.Length;
-                (*palette).version = 0;
-                (*palette).ncolors = colors.Length;
-                SDL.SDL_Color[] SDLcolors = new SDL.SDL_Color[colors.Length];
-                for (int i = 0; i < colors.Length; i++)
-                {
-                    SDL.SDL_Color c = new SDL.SDL_Color();
-                    c.r = (byte)colors[i].R;
-                    c.g = (byte)colors[i].G;
-                    c.b = (byte)colors[i].B;
-                    c.a = 255;
-                    SDLcolors[i] = c;
-                }
-                if (SDL.SDL_SetPaletteColors((IntPtr)palette, SDLcolors, 0, SDLcolors.Length) != 0)
-                {
-                    Console.WriteLine($"Error Setting the patette{Environment.NewLine}{SDL.SDL_GetError()}");
-                    SDL.SDL_FreePalette((IntPtr)palette);
-                    Environment.Exit(1);
-                }
-                SDL.SDL_FreePalette((IntPtr)palette);
-            }
-
         }
 
         public void SetFont(string resourceKeyImage, string resourceKeyFontHeight, string resourceKeyFontWidth, string resourceKeyCharsPerRow, string resourceKeyCharsPerCol)
@@ -283,6 +254,7 @@ namespace GameInConsoleEngine.Engine
             if (File.Exists(fontPath))
             {
                 FontTools.GetImageBitmap(fontPath, fontWidth, fontHeight, charsPerRow, charsPerCol);
+                FontTools.CacheChars(Palette, 30, 126);
             }
         }
 
@@ -297,7 +269,8 @@ namespace GameInConsoleEngine.Engine
 
         public void SetTitle(string title)
         {
-            SDL.SDL_SetWindowTitle(window, title);
+            window.Title = title;
+            // SDL.SDL_SetWindowTitle(window, title);
         }
 
         /// <summary>Gets Background</summary>
@@ -316,15 +289,17 @@ namespace GameInConsoleEngine.Engine
             Array.Clear(BackgroundBuffer, 0, BackgroundBuffer.Length);*/
             for (int y = 0; y < GlyphBuffer.GetLength(1); y++)
                 for (int x = 0; x < GlyphBuffer.GetLength(0); x++)
-                    GlyphBuffer[x, y] = new Glyph();
+                    GlyphBuffer[x, y] = new Glyph(Palette[Background]);
             double diff = (DateTime.Now - dateTimeNow).TotalSeconds;
         }
 
         /// <summary> Blits the screenbuffer to the Console window. </summary>
         public void DisplayBuffer()
         {
+            DateTime dateTimeNow = DateTime.Now;
             ConsoleBuffer.SetBuffer(GlyphBuffer, Palette[Background]);
-            ConsoleBuffer.Blit(renderer, Palette[Background]);
+            ConsoleBuffer.Blit(window, Palette[Background]);
+            double diff = (DateTime.Now - dateTimeNow).TotalSeconds;
         }
 
         #region Primitives
@@ -406,7 +381,7 @@ namespace GameInConsoleEngine.Engine
                 Point point = new Point((pos.X + i) * FontTools.fontWidth, pos.Y * FontTools.fontHeight);
                 WriteText(point, text[i], fgColor, bgColor);
             }
-            double diff = (DateTime.Now - dateTimeNow).TotalSeconds;
+            double diff = (DateTime.Now - dateTimeNow).TotalMilliseconds;
         }
 
         /// <summary> Writes plain text to the buffer. </summary>
@@ -418,13 +393,22 @@ namespace GameInConsoleEngine.Engine
         {
             DateTime dateTimeNow = DateTime.Now;
             int charIndex = (byte)c;
-            Color[] colors = FontTools.GetChar(charIndex);
+            double diff1 = (DateTime.Now - dateTimeNow).TotalMilliseconds;
+            Rgba32[] fontColors = FontTools.GetChar(charIndex, Palette);
+            double diff2 = (DateTime.Now - dateTimeNow).TotalMilliseconds;
+            DateTime dateTimeNow1 = DateTime.Now;
             for (int y = 0; y < FontTools.fontHeight; y++)
             {
-                for (int x = 0; x < FontTools.fontWidth; x++)
+                int startIndex = y * FontTools.fontWidth;
+                int endIndex = y * FontTools.fontWidth + FontTools.fontWidth;
+                Rgba32[] colors = fontColors[startIndex..endIndex];
+                SetPixels(pos, colors);
+                pos.Y++;
+                /*
+                for (int x = 0; x < FontTools.fontWidth; x++) 
                 {
                     int i = y * FontTools.fontWidth + x;
-                    Color color = colors[i];
+                    Color color = fontColors[i];
                     char cToPrint = c;
                     if (color.AllColor > 0) // have a color
                     {
@@ -434,11 +418,15 @@ namespace GameInConsoleEngine.Engine
                     {
                         cToPrint = '\0';
                     }
-                    int colorIndex = color.NearToColor(Palette, 25);
+                    int colorIndex = Palette.ToList().IndexOf(fontColors[i]);
                     SetPixel(pos + new Point(x, y), colorIndex, bgColor, cToPrint);
                 }
+                 */
             }
             double diff = (DateTime.Now - dateTimeNow).TotalMilliseconds;
+            double _1diff = (DateTime.Now - dateTimeNow1).TotalMilliseconds;
+            // 1: 13.9948
+            // 2: 12.1910
         }
 
         /// <summary>  Writes text to the buffer in a FIGlet font, calls new method with Background as the bgColor. </summary>
@@ -788,9 +776,7 @@ namespace GameInConsoleEngine.Engine
         /// <returns>True if Console is in focus</returns>
         private bool ConsoleFocused()
         {
-            // TODO
-            //return NativeMethods.GetConsoleWindow() == NativeMethods.GetForegroundWindow();
-            return false;
+            return window.IsFocused;
         }
 
         /// <summary> Checks if specified key is pressed. </summary>
@@ -798,20 +784,19 @@ namespace GameInConsoleEngine.Engine
         /// <returns>True if key is pressed</returns>
         public bool GetKey(ConsoleKey key)
         {
-            if (keyboardEvent.type == SDL.SDL_EventType.SDL_KEYUP)
+            if (!ConsoleFocused())
             {
-                SDL.SDL_Scancode keycode = keyboardEvent.keysym.scancode;
-                ConsoleKey consoleKey = SDL_KeycodeToConsoleKey(keycode);
-                if (consoleKey == key)
-                {
-                    return true;
-                }
+                return false;
+            }
+            KeyboardState keyboard = window.KeyboardState;
+            if (keyboard.IsKeyPressed((Keys)key))
+            {
+                return true;
             }
             else
             {
                 return false;
             }
-            return false;
         }
 
         /// <summary> Checks if specified keyCode is pressed. </summary>
@@ -827,20 +812,19 @@ namespace GameInConsoleEngine.Engine
         /// <returns>True if key is down</returns>
         public bool GetKeyDown(ConsoleKey key)
         {
-            if (keyboardEvent.type == SDL.SDL_EventType.SDL_KEYDOWN)
+            if (!ConsoleFocused())
             {
-                SDL.SDL_Scancode keycode = keyboardEvent.keysym.scancode;
-                ConsoleKey consoleKey = SDL_KeycodeToConsoleKey(keycode);
-                if (consoleKey == key)
-                {
-                    return true;
-                }
+                return false;
+            }
+            KeyboardState keyboard = window.KeyboardState;
+            if (keyboard.IsKeyDown((Keys)key))
+            {
+                return true;
             }
             else
             {
                 return false;
             }
-            return false;
         }
 
         /// <summary> Checks if specified keyCode is pressed down. </summary>
@@ -855,9 +839,14 @@ namespace GameInConsoleEngine.Engine
         /// <returns>True if left mouse button is down</returns>
         public bool GetMouseLeft()
         {
-            if (mouseButtonEvent.type == SDL.SDL_EventType.SDL_MOUSEBUTTONDOWN)
+            if (!ConsoleFocused())
             {
-                if (mouseButtonEvent.button == SDL.SDL_BUTTON_LEFT)
+                return false;
+            }
+            MouseState mouse = window.MouseState;
+            if (mouse.IsAnyButtonDown)
+            {
+                if (mouse.IsButtonPressed(MouseButton.Left))
                 {
                     return true;
                 }
@@ -873,9 +862,14 @@ namespace GameInConsoleEngine.Engine
         /// <returns>True if right mouse button is down</returns>
         public bool GetMouseRight()
         {
-            if (mouseButtonEvent.type == SDL.SDL_EventType.SDL_MOUSEBUTTONDOWN)
+            if (!ConsoleFocused())
             {
-                if (mouseButtonEvent.button == SDL.SDL_BUTTON_RIGHT)
+                return false;
+            }
+            MouseState mouse = window.MouseState;
+            if (mouse.IsAnyButtonDown)
+            {
+                if (mouse.IsButtonPressed(MouseButton.Right))
                 {
                     return true;
                 }
@@ -891,9 +885,14 @@ namespace GameInConsoleEngine.Engine
         /// <returns>True if middle mouse button is down</returns>
         public bool GetMouseMiddle()
         {
-            if (mouseButtonEvent.type == SDL.SDL_EventType.SDL_MOUSEBUTTONDOWN)
+            if (!ConsoleFocused())
             {
-                if (mouseButtonEvent.button == SDL.SDL_BUTTON_MIDDLE)
+                return false;
+            }
+            MouseState mouse = window.MouseState;
+            if (mouse.IsAnyButtonDown)
+            {
+                if (mouse.IsButtonPressed(MouseButton.Middle))
                 {
                     return true;
                 }
@@ -909,139 +908,15 @@ namespace GameInConsoleEngine.Engine
         /// <returns>The mouse's position in character-space.</returns>
         public Point GetMousePos()
         {
-            Point point = new Point(mouseMotionEvent.x, mouseMotionEvent.y);
-            return new Point(Utility.Clamp(point.X, 0, WindowSize.X - 1), Utility.Clamp(point.Y, 0, WindowSize.Y - 1));
-        }
-
-        private ConsoleKey SDL_KeycodeToConsoleKey(SDL.SDL_Scancode keycode)
-        {
-            switch (keycode)
+            if (!ConsoleFocused())
             {
-                case SDL.SDL_Scancode.SDL_SCANCODE_UNKNOWN:
-                    return ConsoleKey.None;
-                case SDL.SDL_Scancode.SDL_SCANCODE_A:
-                case SDL.SDL_Scancode.SDL_SCANCODE_B:
-                case SDL.SDL_Scancode.SDL_SCANCODE_C:
-                case SDL.SDL_Scancode.SDL_SCANCODE_D:
-                case SDL.SDL_Scancode.SDL_SCANCODE_E:
-                case SDL.SDL_Scancode.SDL_SCANCODE_F:
-                case SDL.SDL_Scancode.SDL_SCANCODE_G:
-                case SDL.SDL_Scancode.SDL_SCANCODE_H:
-                case SDL.SDL_Scancode.SDL_SCANCODE_I:
-                case SDL.SDL_Scancode.SDL_SCANCODE_J:
-                case SDL.SDL_Scancode.SDL_SCANCODE_K:
-                case SDL.SDL_Scancode.SDL_SCANCODE_L:
-                case SDL.SDL_Scancode.SDL_SCANCODE_M:
-                case SDL.SDL_Scancode.SDL_SCANCODE_N:
-                case SDL.SDL_Scancode.SDL_SCANCODE_O:
-                case SDL.SDL_Scancode.SDL_SCANCODE_P:
-                case SDL.SDL_Scancode.SDL_SCANCODE_Q:
-                case SDL.SDL_Scancode.SDL_SCANCODE_R:
-                case SDL.SDL_Scancode.SDL_SCANCODE_S:
-                case SDL.SDL_Scancode.SDL_SCANCODE_T:
-                case SDL.SDL_Scancode.SDL_SCANCODE_U:
-                case SDL.SDL_Scancode.SDL_SCANCODE_V:
-                case SDL.SDL_Scancode.SDL_SCANCODE_W:
-                case SDL.SDL_Scancode.SDL_SCANCODE_X:
-                case SDL.SDL_Scancode.SDL_SCANCODE_Y:
-                case SDL.SDL_Scancode.SDL_SCANCODE_Z:
-                    return (ConsoleKey)(((ushort)keycode) + 61);
-                case SDL.SDL_Scancode.SDL_SCANCODE_1:
-                case SDL.SDL_Scancode.SDL_SCANCODE_2:
-                case SDL.SDL_Scancode.SDL_SCANCODE_3:
-                case SDL.SDL_Scancode.SDL_SCANCODE_4:
-                case SDL.SDL_Scancode.SDL_SCANCODE_5:
-                case SDL.SDL_Scancode.SDL_SCANCODE_6:
-                case SDL.SDL_Scancode.SDL_SCANCODE_7:
-                case SDL.SDL_Scancode.SDL_SCANCODE_8:
-                case SDL.SDL_Scancode.SDL_SCANCODE_9:
-                    return (ConsoleKey)(((ushort)keycode) + 19);
-                case SDL.SDL_Scancode.SDL_SCANCODE_0:
-                    return ConsoleKey.D0;
-                case SDL.SDL_Scancode.SDL_SCANCODE_RETURN:
-                case SDL.SDL_Scancode.SDL_SCANCODE_KP_ENTER:
-                    return ConsoleKey.Enter;
-                case SDL.SDL_Scancode.SDL_SCANCODE_ESCAPE:
-                    return ConsoleKey.Escape;
-                case SDL.SDL_Scancode.SDL_SCANCODE_BACKSPACE:
-                    return ConsoleKey.Backspace;
-                case SDL.SDL_Scancode.SDL_SCANCODE_TAB:
-                    return ConsoleKey.Tab;
-                case SDL.SDL_Scancode.SDL_SCANCODE_SPACE:
-                    return ConsoleKey.Spacebar;
-                case SDL.SDL_Scancode.SDL_SCANCODE_MINUS:
-                    return ConsoleKey.OemMinus;
-                case SDL.SDL_Scancode.SDL_SCANCODE_BACKSLASH:
-                case SDL.SDL_Scancode.SDL_SCANCODE_SLASH:
-                case SDL.SDL_Scancode.SDL_SCANCODE_KP_DIVIDE:
-                    return ConsoleKey.Divide;
-                case SDL.SDL_Scancode.SDL_SCANCODE_COMMA:
-                    return ConsoleKey.OemComma;
-                case SDL.SDL_Scancode.SDL_SCANCODE_PERIOD:
-                    return ConsoleKey.OemPeriod;
-                case SDL.SDL_Scancode.SDL_SCANCODE_F1:
-                case SDL.SDL_Scancode.SDL_SCANCODE_F2:
-                case SDL.SDL_Scancode.SDL_SCANCODE_F3:
-                case SDL.SDL_Scancode.SDL_SCANCODE_F4:
-                case SDL.SDL_Scancode.SDL_SCANCODE_F5:
-                case SDL.SDL_Scancode.SDL_SCANCODE_F6:
-                case SDL.SDL_Scancode.SDL_SCANCODE_F7:
-                case SDL.SDL_Scancode.SDL_SCANCODE_F8:
-                case SDL.SDL_Scancode.SDL_SCANCODE_F9:
-                case SDL.SDL_Scancode.SDL_SCANCODE_F10:
-                case SDL.SDL_Scancode.SDL_SCANCODE_F11:
-                case SDL.SDL_Scancode.SDL_SCANCODE_F12:
-                    return (ConsoleKey)(((ushort)keycode) + 54);
-                case SDL.SDL_Scancode.SDL_SCANCODE_PRINTSCREEN:
-                    return ConsoleKey.PrintScreen;
-                case SDL.SDL_Scancode.SDL_SCANCODE_PAUSE:
-                    return ConsoleKey.Pause;
-                case SDL.SDL_Scancode.SDL_SCANCODE_INSERT:
-                    return ConsoleKey.Insert;
-                case SDL.SDL_Scancode.SDL_SCANCODE_HOME:
-                    return ConsoleKey.Home;
-                case SDL.SDL_Scancode.SDL_SCANCODE_PAGEUP:
-                    return ConsoleKey.PageUp;
-                case SDL.SDL_Scancode.SDL_SCANCODE_DELETE:
-                    return ConsoleKey.Delete;
-                case SDL.SDL_Scancode.SDL_SCANCODE_END:
-                    return ConsoleKey.End;
-                case SDL.SDL_Scancode.SDL_SCANCODE_PAGEDOWN:
-                    return ConsoleKey.PageDown;
-                case SDL.SDL_Scancode.SDL_SCANCODE_RIGHT:
-                    return ConsoleKey.RightArrow;
-                case SDL.SDL_Scancode.SDL_SCANCODE_LEFT:
-                    return ConsoleKey.LeftArrow;
-                case SDL.SDL_Scancode.SDL_SCANCODE_DOWN:
-                    return ConsoleKey.DownArrow;
-                case SDL.SDL_Scancode.SDL_SCANCODE_UP:
-                    return ConsoleKey.UpArrow;
-                case SDL.SDL_Scancode.SDL_SCANCODE_KP_MULTIPLY:
-                    return ConsoleKey.Multiply;
-                case SDL.SDL_Scancode.SDL_SCANCODE_KP_MINUS:
-                    return ConsoleKey.Subtract;
-                case SDL.SDL_Scancode.SDL_SCANCODE_KP_PLUS:
-                    return ConsoleKey.OemPlus;
-                case SDL.SDL_Scancode.SDL_SCANCODE_KP_1:
-                case SDL.SDL_Scancode.SDL_SCANCODE_KP_2:
-                case SDL.SDL_Scancode.SDL_SCANCODE_KP_3:
-                case SDL.SDL_Scancode.SDL_SCANCODE_KP_4:
-                case SDL.SDL_Scancode.SDL_SCANCODE_KP_5:
-                case SDL.SDL_Scancode.SDL_SCANCODE_KP_6:
-                case SDL.SDL_Scancode.SDL_SCANCODE_KP_7:
-                case SDL.SDL_Scancode.SDL_SCANCODE_KP_8:
-                case SDL.SDL_Scancode.SDL_SCANCODE_KP_9:
-                    return (ConsoleKey)(((ushort)keycode) - 40);
-                case SDL.SDL_Scancode.SDL_SCANCODE_KP_0:
-                    return ConsoleKey.D0;
-                case SDL.SDL_Scancode.SDL_SCANCODE_KP_PERIOD:
-                    return ConsoleKey.OemPeriod;
-                case SDL.SDL_Scancode.SDL_SCANCODE_APPLICATION:
-                    return ConsoleKey.Applications;
-                case SDL.SDL_Scancode.SDL_SCANCODE_KP_COMMA:
-                    return ConsoleKey.OemComma;
+                return new Point(-1,-1);
             }
-            return ConsoleKey.None;
+            MouseState mouse = window.MouseState;
+            int posX = (int)(mouse.X * window.Size.X);
+            int posY = (int)(mouse.Y * window.Size.Y);
+            Point point = new Point(posX, posY);
+            return new Point(Utility.Clamp(point.X, 0, WindowSize.X - 1), Utility.Clamp(point.Y, 0, WindowSize.Y - 1));
         }
     }
 }

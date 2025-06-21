@@ -12,6 +12,7 @@ namespace GameInConsole.Game.Dialogsystem
         static readonly GameInConsoleEngine.Engine.Point DialogNamePoint = new GameInConsoleEngine.Engine.Point(0, 41);
         public static void DisplayDialog(DialogEntry entry, ConsoleEngine engine)
         {
+            //GetImage();
             // Image<Rgba32> image = GetImage(entry);
             string dialogString = entry.dialog;
             string NPCname = EngineVariabels.NPCs[entry.NPC].Name;
@@ -80,13 +81,21 @@ namespace GameInConsole.Game.Dialogsystem
             }
             return result.ToArray();
         }
-
+        /*
         static Image<Rgba32> GetImage(DialogEntry entry)
         {
             string key = EngineVariabels.NPCs[entry.NPC].ResourceKey;
-            ResourceEntry resourceEntry = Resources.GetEntry(key);
-            return ImageTools.GetImageBitmap(resourceEntry.value);
+            string NPCimgName = key + "_img";
+            if (Resources.GetEntry(NPCimgName, out ResourceEntry resourceEntry))
+            {
+            }
+            else
+            {
+                return ImageTools.GetImageBitmap(resourceEntry.value);
+            }
+
         }
+         */
     }
 
     public class DialogEntry

@@ -27,6 +27,17 @@
             return resourceEntries[key];
         }
 
+        public static bool GetEntry(string key, out ResourceEntry entry)
+        {
+            if (!resourceEntries.ContainsKey(key))
+            {
+                entry = null;
+                return false;
+            }
+            entry = resourceEntries[key];
+            return true;
+        }
+
         private static ResourceEntry GetResourceEntry(string path, Type type)
         {
             ResourceEntry entry = new ResourceEntry();

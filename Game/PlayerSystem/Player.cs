@@ -14,6 +14,9 @@ namespace GameInConsole.Game.PlayerSystem
         private List<InventorySlotEntry> PlayerInventory = new List<InventorySlotEntry>();
         private Stats PlayerStats;
         private int counter = 0;
+        public override void Awake()
+        {
+        }
         public override void Start()
         {
             PlayerStats = new Stats(10,0);

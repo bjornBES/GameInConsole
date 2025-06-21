@@ -1,7 +1,14 @@
 ﻿using GameInConsole.Engine.Tools;
 using GameInConsoleEngine.Resource;
 using SDL2;
+using OpenTK.Graphics.OpenGL4;
+using OpenTK.Windowing.Common;
+using OpenTK.Windowing.Desktop;
+using OpenTK.Windowing.GraphicsLibraryFramework;
+using OpenTK;
 using SixLabors.ImageSharp.Formats.Tiff.Compression;
+using System.Threading.Tasks;
+using OpenTK.Mathematics;
 
 namespace GameInConsoleEngine.Engine
 {
@@ -33,13 +40,12 @@ namespace GameInConsoleEngine.Engine
         private List<ThreadMono> threads = new List<ThreadMono>(16);
 
         private double[] framerateSamples;
-        IntPtr window;
-        IntPtr renderer;
-        bool reset = false;
+        GameWindow window;
 
         public double upadteTime;
         public double upadteThreadTime;
         public double renderTime;
+        bool doneRender;
 
         /// <summary> Initializes the ConsoleGame. Creates the instance of a ConsoleEngine and starts the game loop. </summary>
         /// <param name="width">Width of the window.</param>
@@ -50,89 +56,41 @@ namespace GameInConsoleEngine.Engine
         /// <see cref="FramerateMode"/> <see cref="ConsoleEngine"/>
         public void Construct(int width, int height, int fontW, int fontH)
         {
-
-#if DEBUG
-            SDL.SDL_SetHint(SDL.SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING, "1");
-#endif
-
             TargetFramerate = 30;
+            var nativeWindowSettings = new NativeWindowSettings()
+            {
+                ClientSize = new Vector2i(width, height),
+                Title = "LearnOpenTK - Creating a Window",
+                
+                // This is needed to run on macos
+                Flags = ContextFlags.ForwardCompatible,
+                IsEventDriven = true,
+            };
+            GameWindowSettings gameWindowSettings = new GameWindowSettings()
+            {
+                UpdateFrequency = TargetFramerate
+            };
+            window = new GameWindow(gameWindowSettings, nativeWindowSettings);
 
-        _reset:
-            SDL.SDL_Init(SDL.SDL_INIT_VIDEO);
-            window = SDL.SDL_CreateWindow("Window Here :)", SDL.SDL_WINDOWPOS_CENTERED, SDL.SDL_WINDOWPOS_CENTERED, width, height, SDL.SDL_WindowFlags.SDL_WINDOW_SHOWN);
-            renderer = SDL.SDL_CreateRenderer(window, -1, SDL.SDL_RendererFlags.SDL_RENDERER_ACCELERATED);
-
-            Engine = new ConsoleEngine(width, height, fontW, fontH, window, renderer);
+            window.Load += StartEngine;
+            window.UpdateFrame += EngineUpdate;
+            window.Unload += EngineUnload;
+            window.RenderFrame += EngineRenderFrame;
+            window.FocusedChanged += EngineFocusChanged;
 
             threads = new List<ThreadMono>();
-            Start();
-            for (int i = 0; i < threads.Count; i++)
-            {
-                threads[i].Engine = Engine;
-                threads[i].Start();
-            }
-            StartTime = DateTime.Now;
+
+            int sampleCount = TargetFramerate;
+            framerateSamples = new double[sampleCount];
+
+            RunAwake();
+
+            Engine = new ConsoleEngine(width, height, fontW, fontH, window);
 
             Running = true;
 
-            // gör special checks som ska gå utanför spelloopen
-            // om spel-loopen hänger sig ska man fortfarande kunna avsluta
-            {
-                int sampleCount = TargetFramerate;
-                framerateSamples = new double[sampleCount];
-                DateTime lastTime;
-                float uncorrectedSleepDuration = 1000 / TargetFramerate;
+            window.Run();
 
-                while (Running)
-                {
-                    lastTime = DateTime.UtcNow;
-
-                    FrameCounter++;
-                    FrameCounter = FrameCounter % sampleCount;
-
-                    RunUpdate();
-                    // Thread updateThread = new Thread(new ThreadStart(RunUpdate));
-                    // updateThread.Start();
-
-                    Engine.ClearBuffer();
-                    Thread threadThread = new Thread(new ThreadStart(RunThreads));
-                    threadThread.Start();
-
-                    Thread renderThread = new Thread(new ThreadStart(RunRender));
-                    renderThread.Start();
-                    while (threadThread.ThreadState == ThreadState.Running || renderThread.ThreadState == ThreadState.Running)
-                    {
-                        
-                    }
-                    Engine.DisplayBuffer();
-
-
-
-
-                    if (CheckExit())
-                    {
-                        goto _reset;
-                    }
-
-                    TimeSpan diff = DateTime.UtcNow - lastTime;
-                    DeltaTime = (float)(1 / (TargetFramerate * diff.TotalSeconds));
-
-                    float computingDuration = (float)diff.TotalMilliseconds;
-                    int sleepDuration = (int)(uncorrectedSleepDuration - computingDuration);
-                    if (sleepDuration > 0)
-                    {
-                        // programmet ligger före maxFps, sänker det
-                        Thread.Sleep(sleepDuration);
-                    }
-
-                    //increases total frames
-                    FrameTotal++;
-
-                    // beräknar framerate
-
-                    framerateSamples[FrameCounter] = diff.TotalSeconds;
-                }
-            }
             if (threads != null)
             {
                 for (int i = 0; i < threads.Count; i++)
@@ -145,90 +103,126 @@ namespace GameInConsoleEngine.Engine
             CleanUp();
         }
 
-        void RunUpdate()
+        private void EngineFocusChanged(FocusedChangedEventArgs obj)
         {
-            Input.UpdateAll(Engine);
-            DateTime startOfUpdating = DateTime.UtcNow;
-            Update(DeltaTime);
-            upadteTime = (DateTime.UtcNow - startOfUpdating).TotalMilliseconds;
-        }
-        void RunThreads()
-        {
-            DateTime startOfUpdating = DateTime.UtcNow;
-            for (int i = 0; i < threads.Count; i++)
+            Engine.FocusChanged(obj.IsFocused);
+            if (obj.IsFocused)
             {
-                Thread thread = new Thread(new ThreadStart(threads[i].UpdateAll));
-                thread.Start();
+                
             }
-            upadteThreadTime = (DateTime.UtcNow - startOfUpdating).TotalMilliseconds;
-        }
-        void RunRender()
-        {
-            DateTime startOfUpdating = DateTime.UtcNow;
-            Render(DeltaTime);
-            renderTime = (DateTime.UtcNow - startOfUpdating).TotalMilliseconds;
-        }
-
-        /*
-        private void GameLoopLocked()
-        {
-            int sampleCount = TargetFramerate;
-            framerateSamples = new double[sampleCount];
-
-            DateTime lastTime;
-            float uncorrectedSleepDuration = 1000 / TargetFramerate;
-            while (Running)
+            else
             {
-                lastTime = DateTime.UtcNow;
 
-                FrameCounter++;
-                FrameCounter = FrameCounter % sampleCount;
+            }
+        }
 
-                // kör main programmet
+        private void EngineRenderFrame(FrameEventArgs obj)
+        {
+            if (!window.IsFocused)
+            {
+                return;
+            }
+            DateTime dateTimeNow = DateTime.Now;
+            doneRender = false;
+            Engine.ClearBuffer();
+            double diff1 = (DateTime.Now - dateTimeNow).TotalMilliseconds;
+            RunRender((float)obj.Time);
+            double diff2 = (DateTime.Now - dateTimeNow).TotalMilliseconds;
+            Engine.DisplayBuffer();
+            double diff3 = (DateTime.Now - dateTimeNow).TotalMilliseconds;
+        }
 
-                // RenderUpdate();
-
-                // Thread updateThread = new Thread(new ThreadStart(Update));
-                // Thread renderThread = new Thread(new ThreadStart(Render));
-                // updateThread.Start();
-                // renderThread.Start();
-
-                Update(DeltaTime);
+        private void EngineUnload()
+        {
+            Engine.RunEvents = false;
+            if (threads != null)
+            {
                 for (int i = 0; i < threads.Count; i++)
                 {
-                    threads[i].Update(DeltaTime);
+                    threads[i].Stop();
                 }
-                SDL.SDL_RenderClear(renderer);
-                Render(DeltaTime);
-                SDL.SDL_RenderPresent(renderer);
-                Engine.getEvents();
-
-                // while (updateThread.ThreadState == ThreadState.Running || renderThread.ThreadState == ThreadState.Running)
-                // {
-                // 
-                // }
-
-                TimeSpan diff = DateTime.UtcNow - lastTime;
-                DeltaTime = (float)(1 / (TargetFramerate * diff.TotalSeconds));
-
-                float computingDuration = (float)diff.TotalMilliseconds;
-                int sleepDuration = (int)(uncorrectedSleepDuration - computingDuration);
-                if (sleepDuration > 0)
-                {
-                    // programmet ligger före maxFps, sänker det
-                    Thread.Sleep(sleepDuration);
-                }
-
-                //increases total frames
-                FrameTotal++;
-
-                // beräknar framerate
-
-                framerateSamples[FrameCounter] = diff.TotalSeconds;
+                threads = null;
             }
+            Resources.Clear();
+            CleanUp();
         }
-        */
 
+        void EngineUpdate(FrameEventArgs args)
+        {
+            if (!window.IsFocused)
+            {
+                return;
+            }
+            DateTime lastTime = DateTime.UtcNow;
+            window.UpdateFrequency = TargetFramerate;
+
+            FrameCounter++;
+            FrameCounter = FrameCounter % TargetFramerate;
+            
+            RunUpdate(args.Time);
+
+            TimeSpan diff = DateTime.UtcNow - lastTime;
+            DeltaTime = (float)(1 / (TargetFramerate * diff.TotalMilliseconds));
+
+            framerateSamples[FrameCounter] = (double)diff.TotalMilliseconds;
+
+            FrameTotal++;
+            Console.WriteLine($"updateTime:{upadteTime:n2}, renderTime:{renderTime:n2}");
+        }
+
+        void StartEngine()
+        {
+            Start();
+            for (int i = 0; i < threads.Count; i++)
+            {
+                threads[i].Engine = Engine;
+                threads[i].runStart();
+            }
+            StartTime = DateTime.Now;
+        }
+
+        void RunAwake()
+        {
+            for (int i = 0; i < threads.Count; i++)
+            {
+                threads[i].runAwake();
+            }
+            Awake();
+        }
+        async void RunUpdate(double deltaTime)
+        {
+            if (!window.IsFocused)
+            {
+                return;
+            }
+            DateTime startOfUpdating = DateTime.UtcNow;
+            Input.UpdateAll(Engine);
+
+            List<Task> updateTasks = threads.Select(thread => thread.runUpdate()).ToList();
+            await Task.WhenAll(updateTasks);
+
+            Update((float)deltaTime);
+            upadteTime = (DateTime.UtcNow - startOfUpdating).TotalMilliseconds;
+        }
+        async void RunRender(float deltaTime)
+        {
+            if (!window.IsFocused)
+            {
+                return;
+            }
+            DateTime startOfUpdating = DateTime.Now;
+            
+            double diff1 = (DateTime.Now - startOfUpdating).TotalMilliseconds;
+            List<Task> renderTasks = threads.Select(thread => thread.runRender()).ToList();
+            await Task.WhenAll(renderTasks);
+            double diff2 = (DateTime.Now - startOfUpdating).TotalMilliseconds;
+
+            Render(deltaTime);
+            double diff3 = (DateTime.Now - startOfUpdating).TotalMilliseconds;
+            renderTime = (DateTime.Now  - startOfUpdating).TotalMilliseconds;
+            doneRender = true;
+        }
+/*
         bool CheckExit()
         {
             if (reset || Engine.Exit || Running == false)
@@ -252,15 +246,11 @@ namespace GameInConsoleEngine.Engine
             CheckForExit();
             return false;
         }
+ */
 
         public void AddThreads(ThreadMono threadMono)
         {
             threads.Add(threadMono);
-        }
-
-        public void Reset()
-        {
-            reset = true;
         }
 
         /// <summary> Gets the current framerate the application is running at. </summary>
@@ -270,24 +260,13 @@ namespace GameInConsoleEngine.Engine
             return 1 / (framerateSamples.Sum() / TargetFramerate);
         }
 
-        private void CheckForExit()
-        {
-            if (Engine.GetKeyDown(ConsoleKey.Delete))
-            {
-                Running = false;
-            }
-        }
-
         void CleanUp()
         {
-            SDL.SDL_DestroyRenderer(Engine.renderer);
-            SDL.SDL_DestroyWindow(Engine.window);
-            window = IntPtr.Zero;
-            renderer = IntPtr.Zero;
-            SDL.SDL_Quit();
-
+            window.Close();
         }
 
+        /// <summary> Run once before the first fream, import Resources here. </summary>
+        public abstract void Awake();
         /// <summary> Run once on Creating, import Resources here. </summary>
         public abstract void Start();
         /// <summary> Run every frame with rendering. Do math here. </summary>
